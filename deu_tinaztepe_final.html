@@ -78,7 +78,6 @@
       color: rgba(255,255,255,0.4);
       pointer-events: none;
       z-index: 10;
-      transition: color 0.3s ease;
     }
 
     #mode-label {
@@ -86,7 +85,6 @@
       top: 20px;
       left: 18px;
       font-size: 13px;
-      color: rgba(255,255,255,0.5);
       letter-spacing: 1px;
       pointer-events: none;
       z-index: 10;
@@ -97,7 +95,7 @@
 <body>
   <canvas id="chart"></canvas>
 
-  <div id="mode-label">KAMPÜS</div>
+  <div id="mode-label" style="color:rgba(255,255,255,0.4)">KAMPÜS</div>
 
   <div id="legend">
     <div class="legend-title">Fakülte</div>
@@ -133,7 +131,7 @@
     const THRESHOLD_COLOR = 3;
     const THRESHOLD_PHOTO = 6;
 
-    // Build legend
+    // Legend oluştur
     const legendEl = document.getElementById("legend");
     for (const [name, color] of Object.entries(colorMap)) {
       const item = document.createElement("div");
@@ -143,17 +141,16 @@
     }
 
     const modeLabel = document.getElementById("mode-label");
-    const zoomInfo = document.getElementById("zoom-info");
 
-    // Preload images
+    // Fotoğrafları önceden yükle
     const images = {};
     let imagesLoaded = 0;
     const totalImages = Object.keys(imageMap).length;
 
     for (const [fak, src] of Object.entries(imageMap)) {
       const img = new Image();
-      img.onload = () => { imagesLoaded++; if (imagesLoaded === totalImages) draw(); };
-      img.onerror = () => { imagesLoaded++; if (imagesLoaded === totalImages) draw(); };
+      img.onload = () => { imagesLoaded++; if (imagesLoaded === totalImages && kampusData.length) draw(); };
+      img.onerror = () => { imagesLoaded++; if (imagesLoaded === totalImages && kampusData.length) draw(); };
       img.src = src;
       images[fak] = img;
     }
@@ -174,13 +171,14 @@
     resize();
 
     const margin = { top: 50, right: 40, bottom: 60, left: 70 };
-    let data = [];
+    let kampusData = [];
+    let fakulteData = [];
     let transform = d3.zoomIdentity;
     let xScale, yScale;
 
     function buildScales() {
-      const xExt = d3.extent(data, d => d.ndvi);
-      const yExt = d3.extent(data, d => d.ndbi);
+      const xExt = d3.extent(kampusData, d => d.ndvi);
+      const yExt = d3.extent(kampusData, d => d.ndbi);
       const xPad = (xExt[1] - xExt[0]) * 0.05 || 0.05;
       const yPad = (yExt[1] - yExt[0]) * 0.05 || 0.05;
 
@@ -194,7 +192,7 @@
     }
 
     function draw() {
-      if (!data.length) return;
+      if (!kampusData.length) return;
 
       ctx.clearRect(0, 0, W, H);
       ctx.fillStyle = "#000";
@@ -204,28 +202,25 @@
       const zy = transform.rescaleY(yScale);
       const k = transform.k;
 
-      // Update UI based on zoom level
       const showColors = k >= THRESHOLD_COLOR;
       const showPhotos = k >= THRESHOLD_PHOTO;
 
-      if (showColors) {
-        legendEl.classList.add("visible");
-      } else {
-        legendEl.classList.remove("visible");
-      }
-
+      // UI güncelle
       if (showPhotos) {
+        legendEl.classList.add("visible");
         modeLabel.textContent = "MEKÂN";
         modeLabel.style.color = "rgba(255,255,255,0.8)";
       } else if (showColors) {
+        legendEl.classList.add("visible");
         modeLabel.textContent = "FAKÜLTE";
         modeLabel.style.color = "rgba(255,255,255,0.6)";
       } else {
+        legendEl.classList.remove("visible");
         modeLabel.textContent = "KAMPÜS";
         modeLabel.style.color = "rgba(255,255,255,0.4)";
       }
 
-      // Draw axes
+      // Eksenler
       ctx.strokeStyle = "rgba(255,255,255,0.25)";
       ctx.lineWidth = 0.5;
 
@@ -243,9 +238,8 @@
       ctx.fillStyle = "rgba(255,255,255,0.6)";
       ctx.font = "11px monospace";
       ctx.textAlign = "center";
-      const xTicks = zx.ticks(8);
       let lastXLabel = "";
-      xTicks.forEach(t => {
+      zx.ticks(8).forEach(t => {
         const x = zx(t);
         const label = t.toFixed(2);
         if (x >= margin.left && x <= W - margin.right && label !== lastXLabel) {
@@ -260,9 +254,8 @@
 
       // Y ticks
       ctx.textAlign = "right";
-      const yTicks = zy.ticks(8);
       let lastYLabel = "";
-      yTicks.forEach(t => {
+      zy.ticks(8).forEach(t => {
         const y = zy(t);
         const label = t.toFixed(2);
         if (y >= margin.top && y <= H - margin.bottom && label !== lastYLabel) {
@@ -275,7 +268,7 @@
         }
       });
 
-      // Axis labels
+      // Eksen isimleri
       ctx.fillStyle = "rgba(255,255,255,0.7)";
       ctx.font = "13px monospace";
       ctx.textAlign = "center";
@@ -287,46 +280,58 @@
       ctx.fillText("NDBI", 0, 0);
       ctx.restore();
 
-      // Clip region
+      // Clip
       ctx.save();
       ctx.beginPath();
       ctx.rect(margin.left, margin.top, W - margin.left - margin.right, H - margin.top - margin.bottom);
       ctx.clip();
 
-      const photoSize = Math.max(20, Math.min(60, 16 + (k - THRESHOLD_PHOTO) * 5));
-      let photosDrawn = 0;
-      const maxPhotos = 120;
+      if (!showColors) {
+        // KAMPÜS MODU — turkuaz, tüm kampüs verisi (9694 piksel)
+        for (let i = 0; i < kampusData.length; i++) {
+          const d = kampusData[i];
+          const x = zx(d.ndvi);
+          const y = zy(d.ndbi);
 
-      for (let i = 0; i < data.length; i++) {
-        const d = data[i];
-        const x = zx(d.ndvi);
-        const y = zy(d.ndbi);
+          if (x < margin.left - 5 || x > W - margin.right + 5 ||
+              y < margin.top - 5 || y > H - margin.bottom + 5) continue;
 
-        if (x < margin.left - 10 || x > W - margin.right + 10 ||
-            y < margin.top - 10 || y > H - margin.bottom + 10) continue;
-
-        if (showPhotos && photosDrawn < maxPhotos && images[d.fakulte] && images[d.fakulte].complete) {
-          const half = photoSize / 2;
-          ctx.drawImage(images[d.fakulte], x - half, y - half, photoSize, photoSize);
-          ctx.strokeStyle = "rgba(255,255,255,0.25)";
-          ctx.lineWidth = 0.5;
-          ctx.strokeRect(x - half, y - half, photoSize, photoSize);
-          photosDrawn++;
-        } else {
-          const radius = Math.max(1.2, 2 * Math.min(k, 4));
-
-          if (showColors) {
-            ctx.fillStyle = colorMap[d.fakulte] || "#ffffff";
-            ctx.globalAlpha = 0.8;
-          } else {
-            ctx.fillStyle = TURQUOISE;
-            ctx.globalAlpha = 0.55;
-          }
-
+          ctx.fillStyle = TURQUOISE;
+          ctx.globalAlpha = 0.5;
           ctx.beginPath();
-          ctx.arc(x, y, radius, 0, Math.PI * 2);
+          ctx.arc(x, y, Math.max(1, 1.8 * Math.min(k, 3)), 0, Math.PI * 2);
           ctx.fill();
           ctx.globalAlpha = 1;
+        }
+      } else {
+        // FAKÜLTE + FOTOĞRAF MODU — fakülte verisi (2397 piksel)
+        const photoSize = Math.max(20, Math.min(60, 16 + (k - THRESHOLD_PHOTO) * 5));
+        let photosDrawn = 0;
+        const maxPhotos = 120;
+
+        for (let i = 0; i < fakulteData.length; i++) {
+          const d = fakulteData[i];
+          const x = zx(d.ndvi);
+          const y = zy(d.ndbi);
+
+          if (x < margin.left - 10 || x > W - margin.right + 10 ||
+              y < margin.top - 10 || y > H - margin.bottom + 10) continue;
+
+          if (showPhotos && photosDrawn < maxPhotos && images[d.fakulte] && images[d.fakulte].complete) {
+            const half = photoSize / 2;
+            ctx.drawImage(images[d.fakulte], x - half, y - half, photoSize, photoSize);
+            ctx.strokeStyle = "rgba(255,255,255,0.25)";
+            ctx.lineWidth = 0.5;
+            ctx.strokeRect(x - half, y - half, photoSize, photoSize);
+            photosDrawn++;
+          } else {
+            ctx.fillStyle = colorMap[d.fakulte] || "#ffffff";
+            ctx.globalAlpha = 0.8;
+            ctx.beginPath();
+            ctx.arc(x, y, Math.max(1.5, 2.2 * Math.min(k, 4)), 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+          }
         }
       }
 
@@ -345,25 +350,34 @@
 
     d3.select(canvas).call(zoom);
 
-    // Load data
-    d3.csv("piksel_veri.csv", d => ({
-      longitude: +d.longitude,
-      latitude: +d.latitude,
-      ndvi: +d.ndvi,
-      ndbi: +d.ndbi,
-      fakulte: d.fakulte ? d.fakulte.trim() : ""
-    })).then(rows => {
-      data = rows.filter(d => Number.isFinite(d.ndvi) && Number.isFinite(d.ndbi) && d.fakulte);
+    // İki CSV'yi paralel yükle
+    Promise.all([
+      d3.csv("kampus_piksel_veri.csv", d => ({
+        ndvi: +d.ndvi,
+        ndbi: +d.ndbi
+      })),
+      d3.csv("piksel_veri.csv", d => ({
+        longitude: +d.longitude,
+        latitude: +d.latitude,
+        ndvi: +d.ndvi,
+        ndbi: +d.ndbi,
+        fakulte: d.fakulte ? d.fakulte.trim() : ""
+      }))
+    ]).then(([kampus, fakulte]) => {
+      kampusData = kampus.filter(d => Number.isFinite(d.ndvi) && Number.isFinite(d.ndbi));
+      fakulteData = fakulte.filter(d => Number.isFinite(d.ndvi) && Number.isFinite(d.ndbi) && d.fakulte);
       buildScales();
       draw();
     }).catch(err => {
       ctx.fillStyle = "#fff";
       ctx.font = "14px monospace";
-      ctx.fillText("CSV yüklenemedi: piksel_veri.csv aynı klasörde olmalı.", 20, 30);
+      ctx.fillText("CSV yüklenemedi. Dosyalar aynı klasörde olmalı:", 20, 30);
+      ctx.font = "12px monospace";
+      ctx.fillText("kampus_piksel_veri.csv + piksel_veri.csv", 20, 52);
       console.error(err);
     });
 
-    window.addEventListener("resize", () => { resize(); if (data.length) { buildScales(); draw(); } });
+    window.addEventListener("resize", () => { resize(); if (kampusData.length) { buildScales(); draw(); } });
   </script>
 </body>
 </html>
