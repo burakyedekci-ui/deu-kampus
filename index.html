@@ -217,9 +217,7 @@
     <div class="legend-title">Fakülte</div>
   </div>
 
-  <div id="credit">DEÜ Tınaztepe Kampüsü — Sentinel-2 NDVI/NDBI/GLCM</div>
-  <div id="zoom-info"></div>
-
+  
   <script>
     const colorMap = {
       "Guzel Sanatlar": "#E07A5F",
@@ -417,8 +415,6 @@
         const showColors = k >= 2.5;
         const showPhotos = k >= 5;
 
-        canvas.style.cursor = "grab";
-        zoomInfo.textContent = "Scroll ile zoom · Sürükle ile kaydır";
 
         if (showColors) {
           legendEl.classList.add("visible");
