@@ -505,12 +505,11 @@
         const k = transform.k;
         const data = currentLayer === "glcm" ? fakulteGlcm : fakulteSpektral;
 
-        const photoStart = 2.0;
-        const photoEnd = 4.6;
+        const photoStart = 1.0;
+        const photoEnd = 3.8;
         const photoT = Math.max(0, Math.min(1, (k - photoStart) / (photoEnd - photoStart)));
-        const pointAlpha = 1 - photoT * 0.7;
-        const pointRadius = Math.max(1.0, 1.0 + Math.max(0, k - 1) * 0.14);
-        const photoSize = Math.max(18, Math.min(54, 18 + (k - photoStart) * 6));
+        const pointAlpha = 0;
+        const photoSize = Math.max(16, Math.min(56, 16 + (k - 1) * 6.5));
 
         let photosDrawn = 0;
         for (let i = 0; i < data.length; i++) {
@@ -521,17 +520,9 @@
 
           const c = colorMap[d.fakulte] || "#fff";
 
-          if (pointAlpha > 0.03) {
-            ctx.fillStyle = c;
-            ctx.globalAlpha = 0.9 * pointAlpha;
-            ctx.beginPath();
-            ctx.arc(x, y, pointRadius, 0, Math.PI * 2);
-            ctx.fill();
-          }
-
-          if (photoT > 0.03 && photosDrawn < 150 && images_foto[d.fakulte] && images_foto[d.fakulte].complete) {
-            const alpha = 0.12 + photoT * 0.88;
-            const scaledSize = photoSize * (0.94 + photoT * 0.06);
+          if (photoT > 0 && photosDrawn < 220 && images_foto[d.fakulte] && images_foto[d.fakulte].complete) {
+            const alpha = 0.62 + photoT * 0.38;
+            const scaledSize = photoSize * (0.96 + photoT * 0.08);
             drawThumbSquare(images_foto[d.fakulte], x, y, scaledSize, c, alpha);
             photosDrawn++;
           }
